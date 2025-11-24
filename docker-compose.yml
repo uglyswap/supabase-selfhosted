@@ -2,8 +2,6 @@
 # Version: 2024.01
 # Documentation: https://supabase.com/docs/guides/self-hosting
 
-version: "3.8"
-
 services:
   # ===========================================
   # PostgreSQL Database
@@ -264,65 +262,6 @@ services:
       - supabase-network
 
   # ===========================================
-  # Functions - Edge Functions (Optional)
-  # ===========================================
-  functions:
-    image: supabase/edge-runtime:v1.36.1
-    container_name: supabase-functions
-    depends_on:
-      analytics:
-        condition: service_healthy
-    restart: unless-stopped
-    environment:
-      JWT_SECRET: ${JWT_SECRET}
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
-    volumes:
-      - ./volumes/functions:/home/deno/functions:Z
-    command:
-      - start
-      - --main-service
-      - /home/deno/functions/main
-    networks:
-      - supabase-network
-
-  # ===========================================
-  # Analytics - Logflare
-  # ===========================================
-  analytics:
-    image: supabase/logflare:1.4.0
-    container_name: supabase-analytics
-    healthcheck:
-      test: ["CMD", "curl", "http://localhost:4000/health"]
-      timeout: 5s
-      interval: 5s
-      retries: 10
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    environment:
-      LOGFLARE_NODE_HOST: 127.0.0.1
-      DB_USERNAME: supabase_admin
-      DB_DATABASE: ${POSTGRES_DB:-postgres}
-      DB_HOSTNAME: db
-      DB_PORT: ${POSTGRES_PORT:-5432}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_SCHEMA: _analytics
-      LOGFLARE_API_KEY: ${LOGFLARE_API_KEY:-your-super-secret-and-long-logflare-key}
-      LOGFLARE_SINGLE_TENANT: true
-      LOGFLARE_SUPABASE_MODE: true
-      LOGFLARE_MIN_CLUSTER_SIZE: 1
-      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      POSTGRES_BACKEND_SCHEMA: _analytics
-      LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
-    networks:
-      - supabase-network
-
-  # ===========================================
   # Studio - Dashboard UI
   # ===========================================
   studio:
@@ -334,8 +273,10 @@ services:
       interval: 5s
       retries: 3
     depends_on:
-      analytics:
+      db:
         condition: service_healthy
+      meta:
+        condition: service_started
     restart: unless-stopped
     ports:
       - ${STUDIO_PORT:-3000}:3000/tcp
@@ -351,10 +292,7 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
-      LOGFLARE_API_KEY: ${LOGFLARE_API_KEY:-your-super-secret-and-long-logflare-key}
-      LOGFLARE_URL: http://analytics:4000
-      NEXT_PUBLIC_ENABLE_LOGS: true
-      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+      NEXT_PUBLIC_ENABLE_LOGS: false
     networks:
       - supabase-network
 
